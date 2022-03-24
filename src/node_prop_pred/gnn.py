@@ -1,11 +1,11 @@
 import torch
 import torch.nn.functional as F
-from src.node_embedding.conv_layers.gin import GINConv
-from src.node_embedding.conv_layers.gcn import GCNConv
+from src.node_prop_pred.conv_layers.gin import GINConv
+from src.node_prop_pred.conv_layers.gcn import GCNConv
 
 
 ### GNN to generate node embedding
-class GNN_node(torch.nn.Module):
+class GNN_node_prop(torch.nn.Module):
     """
     Output:
         node representations
@@ -27,7 +27,7 @@ class GNN_node(torch.nn.Module):
 
         """
 
-        super(GNN_node, self).__init__()
+        super(GNN_node_prop, self).__init__()
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
         self.JK = JK

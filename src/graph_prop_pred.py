@@ -7,10 +7,10 @@ from torch_geometric.nn import (
     global_mean_pool,
 )
 
-from src.node_embedding import GNN_node, GNN_node_Virtualnode, ASTNodeEncoder
+from src.node_prop_pred import GNN_node_prop, GNNVirtual_node_prop, ASTNodeEncoder
 
 
-class GNN(torch.nn.Module):
+class GNN_graph_prop(torch.nn.Module):
     def __init__(
         self,
         num_vocab: int,
@@ -46,7 +46,7 @@ class GNN(torch.nn.Module):
 
         ### GNN to generate node embeddings
         if virtual_node:
-            self.gnn_node = GNN_node_Virtualnode(
+            self.gnn_node_prop = GNNVirtual_node_prop(
                 num_layer,
                 emb_dim,
                 node_encoder,
@@ -56,7 +56,7 @@ class GNN(torch.nn.Module):
                 gnn_type=gnn_type,
             )
         else:
-            self.gnn_node = GNN_node(
+            self.gnn_node_prop = GNN_node_prop(
                 num_layer,
                 emb_dim,
                 node_encoder,
@@ -104,13 +104,13 @@ class GNN(torch.nn.Module):
             i-th element represents prediction at i-th position of the sequence.
         """
 
-        h_node = self.gnn_node(batched_data)
+        h_node_prop = self.gnn_node_prop(batched_data)
 
-        h_graph = self.pool(h_node, batched_data.batch)
+        h_graph_prop = self.pool(h_node_prop, batched_data.batch)
 
         pred_list = []
 
         for i in range(self.max_seq_len):
-            pred_list.append(self.graph_pred_linear_list[i](h_graph))
+            pred_list.append(self.graph_pred_linear_list[i](h_graph_prop))
 
         return pred_list

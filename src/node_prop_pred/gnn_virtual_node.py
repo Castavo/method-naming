@@ -1,12 +1,12 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool
-from src.node_embedding.conv_layers.gin import GINConv
-from src.node_embedding.conv_layers.gcn import GCNConv
+from src.node_prop_pred.conv_layers.gin import GINConv
+from src.node_prop_pred.conv_layers.gcn import GCNConv
 
 
 ### Virtual GNN to generate node embedding
-class GNN_node_Virtualnode(torch.nn.Module):
+class GNNVirtual_node_prop(torch.nn.Module):
     """
     Output:
         node representations
@@ -26,7 +26,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
         emb_dim (int): node embedding dimensionality
         """
 
-        super(GNN_node_Virtualnode, self).__init__()
+        super(GNNVirtual_node_prop, self).__init__()
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
         self.JK = JK
