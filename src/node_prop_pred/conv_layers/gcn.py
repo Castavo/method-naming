@@ -1,8 +1,9 @@
+from typing import Tuple
+
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
-from typing import Tuple
 
 
 ### GCN convolution along the graph structure
