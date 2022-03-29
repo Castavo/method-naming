@@ -17,14 +17,11 @@ class ExpC(MessagePassing):
         )
 
         self.aggr_mlp = Sequential(Linear(hidden * 2, self.num_aggr), Tanh())
-
-        # edge_attr is two dimensional after augment_edge transformation
         self.edge_encoder = torch.nn.Linear(2, hidden)
 
     def forward(self, x: torch.TensorType, edge_index: Tuple[int, int], edge_attr):
         edge_attr = self.edge_encoder(edge_attr)
         edge_index, _ = remove_self_loops(edge_index)
-        # edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
         out = self.propagate(edge_index, x=x, edge_attr=edge_attr)
         return out
 
@@ -62,14 +59,11 @@ class ExpC_star(MessagePassing):
         )
 
         self.aggr_mlp = Sequential(Linear(hidden * 2, self.num_aggr), Tanh())
-
-        # edge_attr is two dimensional after augment_edge transformation
         self.edge_encoder = torch.nn.Linear(2, hidden)
 
     def forward(self, x: torch.TensorType, edge_index: Tuple[int, int], edge_attr):
         edge_attr = self.edge_encoder(edge_attr)
         edge_index, _ = remove_self_loops(edge_index)
-        # edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
         out = self.fea_mlp(self.propagate(edge_index, x=x, edge_attr=edge_attr))
         return out
 
