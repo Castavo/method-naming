@@ -1,8 +1,11 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool
-from src.node_prop_pred.conv_layers.gin import GINConv
+
+from src.node_prop_pred.conv_layers.combc import CombC, CombC_star
+from src.node_prop_pred.conv_layers.expc import ExpC, ExpC_star
 from src.node_prop_pred.conv_layers.gcn import GCNConv
+from src.node_prop_pred.conv_layers.gin import GINConv
 
 
 ### Virtual GNN to generate node embedding
@@ -55,6 +58,14 @@ class GNNVirtual_node_prop(torch.nn.Module):
                 self.convs.append(GINConv(emb_dim))
             elif gnn_type == "gcn":
                 self.convs.append(GCNConv(emb_dim))
+            elif gnn_type[:2] == "EB":
+                self.convs.append(ExpC(emb_dim, int(gnn_type[2:])))
+            elif gnn_type[:2] == "EA":
+                self.convs.append(ExpC_star(emb_dim, int(gnn_type[2:])))
+            elif gnn_type == "CB":
+                self.convs.append(CombC(emb_dim))
+            elif gnn_type == "CA":
+                self.convs.append(CombC_star(emb_dim))
             else:
                 raise ValueError(f"Undefined GNN type called {gnn_type}")
 
