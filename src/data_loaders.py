@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from dgl import DGLGraph
 from dgl.dataloading import GraphDataLoader
-from ogb.graphproppred import DglGraphPropPredDataset
+from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
 from torchvision import transforms  # pylint: disable=unused-import
 
 from src.vocab_utils import get_vocab_mapping
@@ -56,18 +56,21 @@ def get_data_loaders(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
+        collate_fn=collate_dgl,
     )
     valid_loader = GraphDataLoader(
         dataset[split_idx["valid"]],
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
+        collate_fn=collate_dgl,
     )
     test_loader = GraphDataLoader(
         dataset[split_idx["test"]],
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
+        collate_fn=collate_dgl,
     )
 
     return train_loader, valid_loader, test_loader, vocab2idx, idx2vocab
