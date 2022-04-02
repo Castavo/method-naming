@@ -1,11 +1,11 @@
+import dgl
 import torch
 from dgl.dataloading import GraphDataLoader
 from torch.optim import Optimizer
 from tqdm import tqdm
-import dgl
 
-from src.vocab_utils import labels_to_tensor
 from src.data_loaders import augment_edge
+from src.vocab_utils import labels_to_tensor
 
 
 def train_epoch(
@@ -28,7 +28,7 @@ def train_epoch(
         batched_graph = dgl.batch(graphs)
         batched_graph = batched_graph.to(device)
 
-        labels = labels_to_tensor(labels, vocab2idx, max_seq_len)
+        labels = labels_to_tensor(labels, vocab2idx, max_seq_len).to(device)
 
         pred_list = model(batched_graph)
         optimizer.zero_grad()

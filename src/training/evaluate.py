@@ -1,12 +1,13 @@
 from typing import Any, Dict
 
+import dgl
 import torch
 from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import Evaluator
 from tqdm import tqdm
 
+from src.data_loaders import augment_edge
 from src.vocab_utils import decode_arr_to_name_seq
-from src.training.train_epoch import train_epoch
 
 
 def evaluate(
@@ -22,6 +23,10 @@ def evaluate(
 
     for _, batch in enumerate(tqdm(loader)):
         batched_graph, labels = batch
+        graphs = dgl.unbatch(batched_graph)
+        for graph in graphs:
+            augment_edge(graph)
+        batched_graph = dgl.batch(graphs)
         batched_graph = batched_graph.to(device)
 
         with torch.no_grad():
