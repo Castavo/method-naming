@@ -1,8 +1,13 @@
+import os
+from multiprocessing import Pool
+from typing import List, Tuple
+
 import numpy as np
 import torch
 from dgl import DGLGraph
 from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
+from tqdm import tqdm
 
 from src.vocab_utils import get_vocab_mapping
 
@@ -48,8 +53,8 @@ def get_data_loaders(
     # encode_y_to_arr: add y_arr to Dgl data object, indicating the array representation of a sequence.
     # dataset = preprocess_dataset(dataset, [augment_edge, lambda data: encode_y_to_arr(data, vocab2idx, max_seq_len)])
 
-    for graph, _ in dataset:
-        augment_edge(graph)
+    with Pool(os.cpu_count()) as p:
+        _ = list(tqdm(p.imap(augment_edge, dataset), total=len(dataset)))
 
     train_loader = GraphDataLoader(
         dataset[split_idx["train"]],
@@ -76,7 +81,7 @@ def get_data_loaders(
     return train_loader, valid_loader, test_loader, vocab2idx, idx2vocab
 
 
-def augment_edge(graph: DGLGraph):
+def augment_edge(data: Tuple[DGLGraph, List[str]]):
     """
     Input:
         graph: DglGraph object
@@ -87,6 +92,8 @@ def augment_edge(graph: DGLGraph):
                 graph.edata["attr"][:,0]: whether it is AST edge (0) or next-token edge (1)
                 graph.edata["attr"][:,1]: whether it is original direction (0) or inverse direction (1)
     """
+
+    graph = data[0]
 
     ##### AST edge
     edge_index_ast = graph.all_edges()
