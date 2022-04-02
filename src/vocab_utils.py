@@ -86,15 +86,18 @@ def encode_name_seq_to_arr(
     )
 
 
-def decode_arr_to_name_seq(arr: List[int], idx2vocab: Dict[int, str]) -> List[int]:
+def decode_arr_to_name_seq(arr: torch.TensorType, idx2vocab: Dict[int, str]) -> List[int]:
     """
     Input: torch 1d array: y_arr
     Output: a sequence of words.
     """
-    try:
-        eos_index = arr.index(len(idx2vocab) - 1)
-        cropped_arr = arr[:eos_index]
-    except ValueError:
-        cropped_arr = arr
+    eos_idx_list = torch.nonzero(
+        arr == len(idx2vocab) - 1, as_tuple=False
+    )  # find the position of __EOS__ (the last vocab in idx2vocab)
 
-    return list(map(lambda x: idx2vocab[x], cropped_arr.cpu()))
+    if len(eos_idx_list) > 0:
+        clippted_arr = arr[: torch.min(eos_idx_list)]
+    else:
+        clippted_arr = arr
+
+    return list(map(lambda x: idx2vocab[x], clippted_arr.cpu()))
