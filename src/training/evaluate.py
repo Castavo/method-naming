@@ -21,7 +21,7 @@ def evaluate(
     seq_ref_list = []
     seq_pred_list = []
 
-    for _, batch in enumerate(tqdm(loader)):
+    for batch in tqdm(loader, mininterval=15):
         batched_graph, labels = batch
         graphs = dgl.unbatch(batched_graph)
         for graph in graphs:
