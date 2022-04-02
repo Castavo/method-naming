@@ -6,14 +6,16 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
-from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
-from sklearn.metrics import roc_auc_score  # pylint: disable=unused-import
 
-from src.data_loaders import get_data_loaders
-from src.graph_representation import ASTNodeEncoder
-from src.method_name_prediction import MethodNamePredictor
-from src.training.evaluate import evaluate
-from src.training.train_epoch import train_epoch
+from sklearn.metrics import roc_auc_score  # pylint: disable=unused-import
+from ogb.graphproppred import DglGraphPropPredDataset
+from ogb.graphproppred import Evaluator
+
+from legacy.data_loaders import get_data_loaders
+from legacy.graph_prop_pred import GNN
+from legacy.node_prop_pred import ASTNodeEncoder
+from legacy.training.evaluate import evaluate
+from legacy.training.train_epoch import train_epoch
 
 
 def train():
@@ -135,9 +137,9 @@ def train():
     else:
         raise ValueError("Invalid GNN type")
 
-    # virtual_node = args.gnn in ["gin-virtual", "gcn-virtual"]
+    virtual_node = args.gnn in ["gin-virtual", "gcn-virtual"]
 
-    model = MethodNamePredictor(
+    model = GNN(
         num_vocab=len(vocab2idx),
         max_seq_len=args.max_seq_len,
         node_encoder=node_encoder,
@@ -145,6 +147,7 @@ def train():
         gnn_type=gnn_type,
         emb_dim=args.emb_dim,
         drop_ratio=args.drop_ratio,
+        virtual_node=virtual_node,
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -164,17 +167,9 @@ def train():
     criterion = torch.nn.CrossEntropyLoss()
 
     for epoch in range(1, args.epochs + 1):
-        print(f"=====Epoch {epoch}")
+        print("=====Epoch {}".format(epoch))
         print("Training...")
-        train_epoch(
-            model,
-            device,
-            train_loader,
-            optimizer,
-            criterion,
-            vocab2idx=vocab2idx,
-            max_seq_len=args.max_seq_len,
-        )
+        train_epoch(model, device, train_loader, optimizer, criterion)
 
         print("Evaluating...")
         train_perf = evaluate(model, device, train_loader, evaluator, idx2vocab)
@@ -194,8 +189,8 @@ def train():
     best_val_epoch = np.argmax(np.array(valid_curve))
     best_train = max(train_curve)
     print("Finished training!")
-    print(f"Best validation score: {valid_curve[best_val_epoch]}")
-    print(f"Test score: {test_curve[best_val_epoch]}")
+    print("Best validation score: {}".format(valid_curve[best_val_epoch]))
+    print("Test score: {}".format(test_curve[best_val_epoch]))
 
     if not args.filename == "":
         result_dict = {

@@ -1,13 +1,8 @@
 import torch
-from torch_geometric.nn import (
-    GlobalAttention,
-    Set2Set,
-    global_add_pool,
-    global_max_pool,
-    global_mean_pool,
-)
 
-from src.node_prop_pred import GNN_node_prop, GNNVirtual_node_prop, ASTNodeEncoder
+from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling, GlobalAttentionPooling
+
+from legacy.node_prop_pred import GNN_node_prop, GNNVirtual_node_prop, ASTNodeEncoder
 
 
 class GNN_graph_prop(torch.nn.Module):
@@ -68,13 +63,13 @@ class GNN_graph_prop(torch.nn.Module):
 
         ### Pooling function to generate whole-graph embeddings
         if self.graph_pooling == "sum":
-            self.pool = global_add_pool
+            self.pool = SumPooling()
         elif self.graph_pooling == "mean":
-            self.pool = global_mean_pool
+            self.pool = AvgPooling()
         elif self.graph_pooling == "max":
-            self.pool = global_max_pool
+            self.pool = MaxPooling()
         elif self.graph_pooling == "attention":
-            self.pool = GlobalAttention(
+            self.pool = GlobalAttentionPooling(
                 gate_nn=torch.nn.Sequential(
                     torch.nn.Linear(emb_dim, 2 * emb_dim),
                     torch.nn.BatchNorm1d(2 * emb_dim),
@@ -82,8 +77,6 @@ class GNN_graph_prop(torch.nn.Module):
                     torch.nn.Linear(2 * emb_dim, 1),
                 )
             )
-        elif self.graph_pooling == "set2set":
-            self.pool = Set2Set(emb_dim, processing_steps=2)
         else:
             raise ValueError("Invalid graph pooling type.")
 
@@ -106,7 +99,7 @@ class GNN_graph_prop(torch.nn.Module):
 
         h_node_prop = self.gnn_node_prop(batched_data)
 
-        h_graph_prop = self.pool(h_node_prop, batched_data.batch)
+        h_graph_prop = self.pool(batched_data, h_node_prop)
 
         pred_list = []
 

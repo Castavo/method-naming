@@ -1,13 +1,10 @@
-from typing import List, Tuple
-
 import numpy as np
 import torch
-from dgl import DGLGraph
-from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset
-from torchvision import transforms  # pylint: disable=unused-import
+from dgl.dataloading import GraphDataLoader
+from torchvision import transforms
 
-from src.vocab_utils import get_vocab_mapping
+from src.vocab_utils import encode_y_to_arr, get_vocab_mapping
 
 
 def get_data_loaders(
@@ -19,7 +16,7 @@ def get_data_loaders(
     num_workers: int,
 ):
 
-    seq_len_list = np.array([len(seq) for seq in dataset.labels])
+    seq_len_list = np.array([len(seq) for seq in dataset.data.y])
     print(
         f"Target sequence less or equal to {max_seq_len} is "
         f"{round(100 * np.sum(seq_len_list <= max_seq_len) / len(seq_len_list), 3)}% of the dataset."
@@ -44,12 +41,15 @@ def get_data_loaders(
         assert len(split_idx["test"]) == num_test
 
     vocab2idx, idx2vocab = get_vocab_mapping(
-        [dataset.labels[i] for i in split_idx["train"]], num_vocab
+        [dataset.data.y[i] for i in split_idx["train"]], num_vocab
     )
 
+    ### set the transform function
     # augment_edge: add next-token edge as well as inverse edges. add edge attributes.
-    # encode_y_to_arr: add y_arr to Dgl data object, indicating the array representation of a sequence.
-    # dataset = preprocess_dataset(dataset, [augment_edge, lambda data: encode_y_to_arr(data, vocab2idx, max_seq_len)])
+    # encode_y_to_arr: add y_arr to PyG data object, indicating the array representation of a sequence.
+    dataset.transform = transforms.Compose(
+        [augment_edge, lambda data: encode_y_to_arr(data, vocab2idx, max_seq_len)]
+    )
 
     train_loader = GraphDataLoader(
         dataset[split_idx["train"]],
@@ -73,23 +73,21 @@ def get_data_loaders(
     return train_loader, valid_loader, test_loader, vocab2idx, idx2vocab
 
 
-def augment_edge(data: Tuple[DGLGraph, List[str]]):
+def augment_edge(data: DglGraphPropPredDataset):
     """
     Input:
-        data: Dgl data object
+        data: PyG data object
     Output:
         data (edges are augmented in the following ways):
             data.edge_index: Added next-token edge. The inverse edges were also added.
             data.edge_attr (torch.Long):
-                data.edge_attr[:,0]: whether it is AST edge (0) or next-token edge (1)
+                data.edge_attr[:,0]: whether it is AST edge (0) for next-token edge (1)
                 data.edge_attr[:,1]: whether it is original direction (0) or inverse direction (1)
     """
 
-    graph: DGLGraph = data[0]
-
     ##### AST edge
-    edge_index_ast = graph.all_edges()
-    edge_attr_ast = torch.zeros((edge_index_ast[0].size(0), 2))
+    edge_index_ast = data.edge_index
+    edge_attr_ast = torch.zeros((edge_index_ast.size(1), 2))
 
     ##### Inverse AST edge
     edge_index_ast_inverse = torch.stack([edge_index_ast[1], edge_index_ast[0]], dim=0)
@@ -102,12 +100,8 @@ def augment_edge(data: Tuple[DGLGraph, List[str]]):
     )
 
     ##### Next-token edge
-    attributed_node_idx_in_dfs_order = torch.where(
-        data.node_is_attributed.view(
-            -1,
-        )
-        == 1
-    )[0]
+
+    attributed_node_idx_in_dfs_order = torch.where(data.node_is_attributed.view(-1) == 1)[0]
 
     ## build next token edge
     # Given: attributed_node_idx_in_dfs_order

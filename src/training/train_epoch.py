@@ -1,33 +1,41 @@
 import torch
-from tqdm import tqdm
-from torch_geometric.loader import DataLoader
+from dgl.dataloading import GraphDataLoader
 from torch.optim import Optimizer
+from tqdm import tqdm
+
+from src.vocab_utils import labels_to_tensor
 
 
 def train_epoch(
-    model: torch.nn.Module, device: str, loader: DataLoader, optimizer: Optimizer, criterion
+    model: torch.nn.Module,
+    device: str,
+    loader: GraphDataLoader,
+    optimizer: Optimizer,
+    criterion,
+    vocab2idx: dict,
+    max_seq_len: int,
 ) -> None:
     model.train()
 
     loss_accum = 0
-    for batch in tqdm(loader, desc="Iteration"):
-        batch = batch.to(device)
+    for batch in tqdm(loader):
+        batched_graph, labels = batch
+        batched_graph = batched_graph.to(device)
 
-        if batch.x.shape[0] == 1 or batch.batch[-1] == 0:
-            pass
-        else:
-            pred_list = model(batch)
-            optimizer.zero_grad()
+        labels = labels_to_tensor(labels, vocab2idx, max_seq_len)
 
-            loss = 0
-            for i, _ in enumerate(pred_list):
-                loss += criterion(pred_list[i].to(torch.float32), batch.y_arr[:, i])
+        pred_list = model(batched_graph)
+        optimizer.zero_grad()
 
-            loss = loss / len(pred_list)
+        loss = 0
+        for i, _ in enumerate(pred_list):
+            loss += criterion(pred_list[i].to(torch.float32), labels[:, i])
 
-            loss.backward()
-            optimizer.step()
+        loss = loss / len(pred_list)
 
-            loss_accum += loss.item()
+        loss.backward()
+        optimizer.step()
+
+        loss_accum += loss.item()
 
     print(f"Average training loss: {loss_accum / len(loader) }")
