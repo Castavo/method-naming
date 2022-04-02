@@ -159,7 +159,10 @@ def train():
     train_curve = []
 
     best_valid = -float("inf")
-    best_model_state_dict = None
+    best_model_state_dict = deepcopy(model.state_dict())
+    if args.model_path:
+        os.makedirs(os.path.dirname(args.model_path), exist_ok=True)
+        torch.save(best_model_state_dict, args.model_path)
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -190,6 +193,8 @@ def train():
         if valid_perf[dataset.eval_metric] > best_valid:
             best_valid = valid_perf[dataset.eval_metric]
             best_model_state_dict = deepcopy(model.state_dict())
+            if args.model_path:
+                torch.save(best_model_state_dict, args.model_path)
 
     best_val_epoch = np.argmax(np.array(valid_curve))
     best_train = max(train_curve)
