@@ -20,7 +20,7 @@ def train_epoch(
     model.train()
 
     loss_accum = 0
-    for batch in tqdm(loader):
+    for batch in tqdm(loader, mininterval=30):
         batched_graph, labels = batch
         graphs = dgl.unbatch(batched_graph)
         for graph in graphs:
