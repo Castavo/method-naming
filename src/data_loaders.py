@@ -1,11 +1,8 @@
-from typing import List, Tuple
-
 import numpy as np
 import torch
 from dgl import DGLGraph
 from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
-from torchvision import transforms  # pylint: disable=unused-import
 
 from src.vocab_utils import get_vocab_mapping
 
@@ -51,6 +48,9 @@ def get_data_loaders(
     # encode_y_to_arr: add y_arr to Dgl data object, indicating the array representation of a sequence.
     # dataset = preprocess_dataset(dataset, [augment_edge, lambda data: encode_y_to_arr(data, vocab2idx, max_seq_len)])
 
+    for graph, _ in dataset:
+        augment_edge(graph)
+
     train_loader = GraphDataLoader(
         dataset[split_idx["train"]],
         batch_size=batch_size,
@@ -76,41 +76,42 @@ def get_data_loaders(
     return train_loader, valid_loader, test_loader, vocab2idx, idx2vocab
 
 
-def augment_edge(data: Tuple[DGLGraph, List[str]]):
+def augment_edge(graph: DGLGraph):
     """
     Input:
-        data: Dgl data object
+        graph: DglGraph object
     Output:
-        data (edges are augmented in the following ways):
-            data.edge_index: Added next-token edge. The inverse edges were also added.
-            data.edge_attr (torch.Long):
-                data.edge_attr[:,0]: whether it is AST edge (0) or next-token edge (1)
-                data.edge_attr[:,1]: whether it is original direction (0) or inverse direction (1)
+        Modifies the graph inplace by adding the following edges and their attributes:
+            graph.edges: Added next-token edge. The inverse edges were also added.
+            graph.edata["attr"] (torch.long):
+                graph.edata["attr"][:,0]: whether it is AST edge (0) or next-token edge (1)
+                graph.edata["attr"][:,1]: whether it is original direction (0) or inverse direction (1)
     """
-
-    graph: DGLGraph = data[0]
 
     ##### AST edge
     edge_index_ast = graph.all_edges()
     edge_attr_ast = torch.zeros((edge_index_ast[0].size(0), 2))
 
+    graph.remove_edges(graph.all_edges("eid"))
+
+    graph.add_edges(edge_index_ast[0], edge_index_ast[1], {"attr": edge_attr_ast})
+
     ##### Inverse AST edge
-    edge_index_ast_inverse = torch.stack([edge_index_ast[1], edge_index_ast[0]], dim=0)
+    edge_index_ast_inverse = (edge_index_ast[1], edge_index_ast[0])
     edge_attr_ast_inverse = torch.cat(
         [
-            torch.zeros(edge_index_ast_inverse.size(1), 1),
-            torch.ones(edge_index_ast_inverse.size(1), 1),
+            torch.zeros(edge_index_ast_inverse[0].size(0), 1),
+            torch.ones(edge_index_ast_inverse[0].size(0), 1),
         ],
         dim=1,
     )
 
+    graph.add_edges(
+        edge_index_ast_inverse[0], edge_index_ast_inverse[1], {"attr": edge_attr_ast_inverse}
+    )
+
     ##### Next-token edge
-    attributed_node_idx_in_dfs_order = torch.where(
-        data.node_is_attributed.view(
-            -1,
-        )
-        == 1
-    )[0]
+    attributed_node_idx_in_dfs_order = torch.where(graph.ndata["is_attributed"].view(-1) == 1)[0]
 
     ## build next token edge
     # Given: attributed_node_idx_in_dfs_order
@@ -118,27 +119,26 @@ def augment_edge(data: Tuple[DGLGraph, List[str]]):
     # Output:
     #    [[1, 3, 4, 5, 8, 9]
     #     [3, 4, 5, 8, 9, 12]
-    edge_index_nextoken = torch.stack(
-        [attributed_node_idx_in_dfs_order[:-1], attributed_node_idx_in_dfs_order[1:]], dim=0
+    edge_index_nextoken = (
+        attributed_node_idx_in_dfs_order[:-1],
+        attributed_node_idx_in_dfs_order[1:],
     )
     edge_attr_nextoken = torch.cat(
-        [torch.ones(edge_index_nextoken.size(1), 1), torch.zeros(edge_index_nextoken.size(1), 1)],
+        [
+            torch.ones(edge_index_nextoken[0].size(0), 1),
+            torch.zeros(edge_index_nextoken[0].size(0), 1),
+        ],
         dim=1,
     )
+
+    graph.add_edges(edge_index_nextoken[0], edge_index_nextoken[1], {"attr": edge_attr_nextoken})
 
     ##### Inverse next-token edge
-    edge_index_nextoken_inverse = torch.stack(
-        [edge_index_nextoken[1], edge_index_nextoken[0]], dim=0
-    )
-    edge_attr_nextoken_inverse = torch.ones((edge_index_nextoken.size(1), 2))
+    edge_index_nextoken_inverse = (edge_index_nextoken[1], edge_index_nextoken[0])
+    edge_attr_nextoken_inverse = torch.ones((edge_index_nextoken[0].size(0), 2))
 
-    data.edge_index = torch.cat(
-        [edge_index_ast, edge_index_ast_inverse, edge_index_nextoken, edge_index_nextoken_inverse],
-        dim=1,
+    graph.add_edges(
+        edge_index_nextoken_inverse[0],
+        edge_index_nextoken_inverse[1],
+        {"attr": edge_attr_nextoken_inverse},
     )
-    data.edge_attr = torch.cat(
-        [edge_attr_ast, edge_attr_ast_inverse, edge_attr_nextoken, edge_attr_nextoken_inverse],
-        dim=0,
-    )
-
-    return data
