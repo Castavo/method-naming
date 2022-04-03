@@ -22,10 +22,14 @@ def train_epoch(
     loss_accum = 0
     for batch in tqdm(loader, mininterval=30):
         batched_graph, labels = batch
+
+        """
         graphs = dgl.unbatch(batched_graph)
         for graph in graphs:
             augment_edge(graph)
         batched_graph = dgl.batch(graphs)
+        """
+
         batched_graph = batched_graph.to(device)
 
         labels = labels_to_tensor(labels, vocab2idx, max_seq_len).to(device)

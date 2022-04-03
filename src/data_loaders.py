@@ -5,6 +5,7 @@ from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
 
 from src.vocab_utils import get_vocab_mapping
+from tqdm import tqdm
 
 
 def get_data_loaders(
@@ -46,6 +47,9 @@ def get_data_loaders(
 
     # augment_edge: add next-token edge as well as inverse edges. add edge attributes.
     # encode_y_to_arr: add y_arr to Dgl data object, indicating the array representation of a sequence.
+
+    for data in tqdm(dataset, mininterval=30):
+        augment_edge(data[0])
 
     train_loader = GraphDataLoader(
         dataset[split_idx["train"]],
