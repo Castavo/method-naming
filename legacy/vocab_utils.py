@@ -1,6 +1,5 @@
-from collections import defaultdict
 from typing import Dict, List, Tuple
-
+from ogb.graphproppred import PygGraphPropPredDataset
 import numpy as np
 import torch
 
@@ -15,7 +14,7 @@ def get_vocab_mapping(
     Output:
         vocab2idx:
             A dictionary that maps vocabulary into integer index.
-            Additionally, we also index '__UNK__' and '__EOS__'
+            Additioanlly, we also index '__UNK__' and '__EOS__'
             '__UNK__' : out-of-vocabulary term
             '__EOS__' : end-of-sentence
 
@@ -24,20 +23,28 @@ def get_vocab_mapping(
 
     """
 
-    vocab_counts = defaultdict(int)
+    vocab_cnt = {}
+    vocab_list = []
     for name_seq in name_seq_list:
         for w in name_seq:
-            vocab_counts[w] += 1
+            if w in vocab_cnt:
+                vocab_cnt[w] += 1
+            else:
+                vocab_cnt[w] = 1
+                vocab_list.append(w)
 
-    counts = np.array(list(vocab_counts.values()))
-    vocabulary = list(vocab_counts.keys())
-    topvocab = np.argsort(counts)[::-1][:num_vocab]
+    cnt_list = np.array([vocab_cnt[w] for w in vocab_list])
+    topvocab = np.argsort(-cnt_list, kind="stable")[:num_vocab]
 
-    print(f"Coverage of top {num_vocab} vocabulary:")
-    print(float(np.sum(counts[topvocab])) / np.sum(counts))
+    print("Coverage of top {} vocabulary:".format(num_vocab))
+    print(float(np.sum(cnt_list[topvocab])) / np.sum(cnt_list))
 
-    vocab2idx = {vocabulary[vocab_idx]: idx for idx, vocab_idx in enumerate(topvocab)}
-    idx2vocab = [vocabulary[vocab_idx] for vocab_idx in topvocab]
+    vocab2idx = {vocab_list[vocab_idx]: idx for idx, vocab_idx in enumerate(topvocab)}
+    idx2vocab = [vocab_list[vocab_idx] for vocab_idx in topvocab]
+
+    # print(topvocab)
+    # print([vocab_list[v] for v in topvocab[:10]])
+    # print([vocab_list[v] for v in topvocab[-10:]])
 
     vocab2idx["__UNK__"] = num_vocab
     idx2vocab.append("__UNK__")
@@ -56,18 +63,19 @@ def get_vocab_mapping(
     return vocab2idx, idx2vocab
 
 
-def labels_to_tensor(labels: List[List[str]], vocab2idx: Dict[str, int], max_seq_len: int):
+def encode_y_to_arr(
+    data: PygGraphPropPredDataset, vocab2idx: Dict[str, int], max_seq_len: int
+) -> PygGraphPropPredDataset:
     """
     Input:
-        labels: Labels with strings
-        output: Labels encoded in integers as a tensor
+        data: PyG graph object
+        output: add y_arr to data
     """
 
-    arrays = []
-    for name_seq in labels:
-        arrays.append(encode_name_seq_to_arr(name_seq, vocab2idx, max_seq_len))
+    name_seq = data.y
+    data.y_arr = encode_name_seq_to_arr(name_seq, vocab2idx, max_seq_len)
 
-    return torch.cat(arrays, dim=0)
+    return data
 
 
 def encode_name_seq_to_arr(
@@ -81,23 +89,20 @@ def encode_name_seq_to_arr(
 
     augmented_seq = name_seq[:max_seq_len] + ["__EOS__"] * max(0, max_seq_len - len(name_seq))
     return torch.tensor(
-        [[vocab2idx.get(w, vocab2idx["__UNK__"]) for w in augmented_seq]],
+        [[vocab2idx[w] if w in vocab2idx else vocab2idx["__UNK__"] for w in augmented_seq]],
         dtype=torch.long,
     )
 
 
-def decode_arr_to_name_seq(arr: torch.TensorType, idx2vocab: Dict[int, str]) -> List[int]:
+def decode_arr_to_name_seq(arr: List[int], idx2vocab: Dict[int, str]) -> List[int]:
     """
     Input: torch 1d array: y_arr
     Output: a sequence of words.
     """
-    eos_idx_list = torch.nonzero(
-        arr == len(idx2vocab) - 1, as_tuple=False
-    )  # find the position of __EOS__ (the last vocab in idx2vocab)
+    try:
+        eos_index = arr.index(len(idx2vocab) - 1)
+        cropped_arr = arr[:eos_index]
+    except ValueError:
+        cropped_arr = arr
 
-    if len(eos_idx_list) > 0:
-        clippted_arr = arr[: torch.min(eos_idx_list)]
-    else:
-        clippted_arr = arr
-
-    return list(map(lambda x: idx2vocab[x], clippted_arr.cpu()))
+    return list(map(lambda x: idx2vocab[x], cropped_arr.cpu()))
