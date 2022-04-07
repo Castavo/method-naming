@@ -88,7 +88,7 @@ def encode_name_seq_to_arr(
 
 def decode_arr_to_name_seq(arr: torch.TensorType, idx2vocab: Dict[int, str]) -> List[int]:
     """
-    Input: torch 1d array: y_arr
+    Input: torch 1d array: arr
     Output: a sequence of words.
     """
     eos_idx_list = torch.nonzero(
@@ -100,4 +100,4 @@ def decode_arr_to_name_seq(arr: torch.TensorType, idx2vocab: Dict[int, str]) -> 
     else:
         clippted_arr = arr
 
-    return list(map(lambda x: idx2vocab[x], clippted_arr.cpu()))
+    return list(map(lambda x: idx2vocab[x.item()], clippted_arr.cpu()))

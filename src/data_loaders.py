@@ -46,8 +46,8 @@ def get_data_loaders(
     )
 
     # augment_edge: add next-token edge as well as inverse edges. add edge attributes.
-    # encode_y_to_arr: add y_arr to Dgl data object, indicating the array representation of a sequence.
 
+    print("Augmenting edges...")
     for data in tqdm(dataset, mininterval=30):
         augment_edge(data[0])
 

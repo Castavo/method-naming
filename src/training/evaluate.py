@@ -1,12 +1,10 @@
 from typing import Any, Dict
 
-import dgl
 import torch
 from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import Evaluator
 from tqdm import tqdm
 
-from src.data_loaders import augment_edge
 from src.vocab_utils import decode_arr_to_name_seq
 
 
@@ -18,34 +16,31 @@ def evaluate(
     idx2vocab: Dict[int, str],
 ) -> Any:
     model.eval()
-    seq_ref_list = []
-    seq_pred_list = []
+    evaluator_input_dict = empty_imput_dict()
 
     for batch in tqdm(loader, mininterval=15):
         batched_graph, labels = batch
-
-        """
-        graphs = dgl.unbatch(batched_graph)
-        for graph in graphs:
-            augment_edge(graph)
-        batched_graph = dgl.batch(graphs)
-        """
-
         batched_graph = batched_graph.to(device)
 
         with torch.no_grad():
             pred_list = model(batched_graph)
 
-        mat = []
-        for pred in pred_list:
-            mat.append(torch.argmax(pred, dim=1).view(-1, 1))
-        mat = torch.cat(mat, dim=1)
+        expand_input_dict(evaluator_input_dict, pred_list, labels, idx2vocab)
 
-        seq_pred = [decode_arr_to_name_seq(arr, idx2vocab) for arr in mat]
+    return evaluator.eval(evaluator_input_dict)
 
-        seq_ref_list.extend(labels)
-        seq_pred_list.extend(seq_pred)
 
-    input_dict = {"seq_ref": seq_ref_list, "seq_pred": seq_pred_list}
+def empty_imput_dict():
+    return {"seq_ref": [], "seq_pred": []}
 
-    return evaluator.eval(input_dict)
+
+def expand_input_dict(input_dict, pred_list, labels, idx2vocab):
+    mat = []
+    for pred in pred_list:
+        mat.append(torch.argmax(pred, dim=1).view(-1, 1))
+    mat = torch.cat(mat, dim=1)
+
+    seq_pred = [decode_arr_to_name_seq(arr, idx2vocab) for arr in mat]
+
+    input_dict["seq_ref"].extend(labels)
+    input_dict["seq_pred"].extend(seq_pred)
