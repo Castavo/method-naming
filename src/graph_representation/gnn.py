@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch.conv import GINConv, GraphConv
-from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling
 
 
 class GNN(nn.Module):
@@ -15,7 +14,6 @@ class GNN(nn.Module):
         JK="last",
         residual=False,
         gnn_type="gin",
-        graph_pooling="sum",
     ):
 
         super().__init__()
@@ -35,25 +33,25 @@ class GNN(nn.Module):
         ###List of GNNs
         self.convs = torch.nn.ModuleList()
         self.batch_norms = torch.nn.ModuleList()
+        if gnn_type == "gin":
+            self.mlp = nn.Sequential(
+                nn.Linear(emb_dim, emb_dim),
+                nn.ReLU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.ReLU(),
+                nn.Linear(emb_dim, emb_dim),
+                nn.ReLU(),
+            )
 
         for _ in range(num_layer):
             if gnn_type == "gin":
-                self.convs.append(GINConv(None, "sum"))
+                self.convs.append(GINConv(self.mlp, "sum"))
             elif gnn_type == "gcn":
                 self.convs.append(GraphConv(emb_dim, emb_dim))
             else:
                 raise ValueError(f"Undefined GNN type called {gnn_type}")
 
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
-
-        if graph_pooling == "sum":
-            self.pool = SumPooling()
-        elif graph_pooling == "mean":
-            self.pool = AvgPooling()
-        elif graph_pooling == "max":
-            self.pool = MaxPooling()
-        else:
-            raise ValueError("Invalid graph pooling type.")
 
     def forward(self, batched_graph):
 
@@ -82,6 +80,4 @@ class GNN(nn.Module):
         elif self.JK == "sum":
             nodes_representation = sum(nodes_embeddings)
 
-        graphs_representation = self.pool(batched_graph, nodes_representation)
-
-        return graphs_representation
+        return nodes_representation

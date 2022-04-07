@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=met_naming_train
 #SBATCH --output=%x.o%j
-#SBATCH --time=15:00:00
+#SBATCH --time=8:00:00
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
@@ -17,4 +17,4 @@ module load cuda/10.2.89/intel-19.0.3.199
 source activate mlns
 
 # Train model
-python -m src.training.train $@
+python -m src.training.train --data_path=/workdir/shared/pulmembol/ogbg_code2 --preprocessed_path=/workdir/shared/pulmembol/ogb-code2-preprocessed $@

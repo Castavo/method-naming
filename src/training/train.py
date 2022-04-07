@@ -1,4 +1,5 @@
 import argparse
+import csv
 import json
 import os
 from copy import deepcopy
@@ -8,7 +9,8 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
-from ogb.graphproppred import DglGraphPropPredDataset, Evaluator
+from dgl.dataloading import GraphDataLoader
+from ogb.graphproppred import Evaluator
 from sklearn.metrics import roc_auc_score  # pylint: disable=unused-import
 
 from src.data_loaders import get_data_loaders
@@ -17,79 +19,24 @@ from src.method_name_prediction import MethodNamePredictor
 from src.training.evaluate import evaluate
 from src.training.train_epoch import train_epoch
 
+EVAL_METRIC = "F1"
 
 def train(
-    batch_size: int,
+    model: MethodNamePredictor,
     num_epochs: int,
     max_seq_len: int,
-    random_split: bool,
-    num_vocab: int,
-    emb_dim: int,
-    gnn_type: str,
-    num_layers: int,
-    drop_ratio: float,
-    num_workers: int,
     device: str,
     model_path: str,
     results_path: str,
     progress_path: str,
-    data_path: str,
+    perf_path: str,
+    train_loader: GraphDataLoader,
+    valid_loader: GraphDataLoader,
+    test_loader: GraphDataLoader,
+    vocab2idx: dict,
+    idx2vocab: dict,
 ):
-    ### automatic dataloading and splitting
-    dataset = DglGraphPropPredDataset(name="ogbg-code2", root=data_path)
-
-    train_loader, valid_loader, test_loader, vocab2idx, idx2vocab = get_data_loaders(
-        dataset=dataset,
-        batch_size=batch_size,
-        max_seq_len=max_seq_len,
-        random_split=random_split,
-        num_vocab=num_vocab,
-        num_workers=num_workers,
-    )
-
-    nodetypes_mapping = pd.read_csv(
-        os.path.join(dataset.root, "mapping", "typeidx2type.csv.gz")
-    )
-    nodeattributes_mapping = pd.read_csv(
-        os.path.join(dataset.root, "mapping", "attridx2attr.csv.gz")
-    )
-
-    print(nodeattributes_mapping)
-
-    ### Encoding node features into emb_dim vectors.
-    ### The following three node features are used.
-    # 1. node type
-    # 2. node attribute
-    # 3. node depth
-    node_encoder = ASTNodeEncoder(
-        emb_dim,
-        num_nodetypes=len(nodetypes_mapping["type"]),
-        num_nodeattributes=len(nodeattributes_mapping["attr"]),
-        max_depth=20,
-    )
-
-    if gnn_type in ["gin", "gin-virtual"]:
-        gnn_type = "gin"
-    elif gnn_type in ["gcn", "gcn-virtual"]:
-        gnn_type = "gcn"
-    else:
-        raise ValueError("Invalid GNN type")
-
-    # virtual_node = gnn_type in ["gin-virtual", "gcn-virtual"]
-
-    model = MethodNamePredictor(
-        num_vocab=len(vocab2idx),
-        max_seq_len=max_seq_len,
-        node_encoder=node_encoder,
-        num_layer=num_layers,
-        gnn_type=gnn_type,
-        emb_dim=emb_dim,
-        drop_ratio=drop_ratio,
-    ).to(device)
-
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    print(f"#Params: {sum(p.numel() for p in model.parameters())}")
 
     ### automatic evaluator. takes dataset name as input
     evaluator = Evaluator(name="ogbg-code2")
@@ -124,13 +71,13 @@ def train(
 
         print({"Train": train_perf, "Validation": valid_perf})
 
-        train_curve.append(train_perf[dataset.eval_metric])
-        valid_curve.append(valid_perf[dataset.eval_metric])
+        train_curve.append(train_perf[EVAL_METRIC])
+        valid_curve.append(valid_perf[EVAL_METRIC])
         if progress_path:
             progress_curve(train_curve, valid_curve, progress_path, evaluator.eval_metric)
 
-        if valid_perf[dataset.eval_metric] > best_valid:
-            best_valid = valid_perf[dataset.eval_metric]
+        if valid_perf[EVAL_METRIC] > best_valid:
+            best_valid = valid_perf[EVAL_METRIC]
             best_model_state_dict = deepcopy(model.state_dict())
             if model_path:
                 torch.save(best_model_state_dict, model_path)
@@ -151,6 +98,10 @@ def train(
             "BestTrain": best_train,
         }
         json.dump(result_dict, open(results_path, "w"), indent=4)
+
+    if perf_path != "":
+        csv_writer = csv.writer(open(perf_path, "w"))
+        csv_writer.writerows([("Train", "Val")] + list(zip(train_curve, valid_curve)))
     
     return model
 
@@ -181,7 +132,7 @@ if __name__ == "__main__":
         help="GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gcn-virtual)",
     )
     parser.add_argument(
-        "--drop_ratio", type=float, default=0, help="dropout ratio (default: 0)",
+        "--drop_ratio", type=float, default=0., help="dropout ratio (default: 0)",
     )
     parser.add_argument(
         "--max_seq_len",
@@ -208,6 +159,17 @@ if __name__ == "__main__":
         help="dimensionality of hidden units in GNNs (default: 300)",
     )
     parser.add_argument(
+        "--graph_pooling",
+        type=str,
+        default="mean",
+        help="Graph pooling method (default: mean)",
+    )
+    parser.add_argument(
+        "--residual",
+        action="store_true",
+        help="Skip_connections between layers (default: False)",
+    )
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=128,
@@ -219,11 +181,11 @@ if __name__ == "__main__":
         default=25,
         help="number of epochs to train (default: 25)",
     )
-    parser.add_argument("--random_split", action="store_true")
     parser.add_argument(
         "--num_workers", type=int, default=0, help="number of workers (default: 0)",
     )
     parser.add_argument("--data_path", default=".", help="path to store and/or fetch ogbg-code2 data")
+    parser.add_argument("--preprocessed_path", default=".", help="path to the preprocessed dataset")
     parser.add_argument("--results_path", default="", help="path to output results")
     parser.add_argument("--model_path", default="", help="path to save model")
     parser.add_argument(
@@ -249,27 +211,81 @@ if __name__ == "__main__":
             args.all_output_path, os.path.basename(args.results_path) or "results.json"
         )
         progress_path = os.path.join(args.all_output_path, "progress.png")
+        perf_path = os.path.join(args.all_output_path, "perfs.csv")
         config_path = os.path.join(args.all_output_path, "config.json")
         json.dump(vars(args), open(config_path, "w"), indent=4)
     else:
         model_path = args.model_path
         results_path = args.results_path
-        progress_path = ""
+        progress_path, perf_path = "", ""
 
-    train(
-        gnn_type=args.gnn_type,
-        drop_ratio=args.drop_ratio,
+
+    ### automatic dataloading and splitting
+    print("Loading data...")
+    train_loader, valid_loader, test_loader, vocab2idx, idx2vocab = get_data_loaders(
+        data_path=args.preprocessed_path,
+        batch_size=args.batch_size,
         max_seq_len=args.max_seq_len,
         num_vocab=args.num_vocab,
-        num_layers=args.num_layers,
-        emb_dim=args.emb_dim,
-        batch_size=args.batch_size,
-        num_epochs=args.epochs,
-        random_split=args.random_split,
         num_workers=args.num_workers,
+    )
+
+    nodetypes_mapping = pd.read_csv(
+        os.path.join(args.data_path, "mapping", "typeidx2type.csv.gz")
+    )
+    nodeattributes_mapping = pd.read_csv(
+        os.path.join(args.data_path, "mapping", "attridx2attr.csv.gz")
+    )
+
+    print(nodeattributes_mapping)
+
+    ### Encoding node features into emb_dim vectors.
+    ### The following three node features are used.
+    # 1. node type
+    # 2. node attribute
+    # 3. node depth
+    print("Building model...")
+    node_encoder = ASTNodeEncoder(
+        args.emb_dim,
+        num_nodetypes=len(nodetypes_mapping["type"]),
+        num_nodeattributes=len(nodeattributes_mapping["attr"]),
+        max_depth=20,
+    )
+
+    if args.gnn_type.startswith("gin"):
+        gnn_type = "gin"
+    elif args.gnn_type.startswith("gcn"):
+        gnn_type = "gcn"
+    else:
+        raise ValueError("Invalid GNN type")
+    virtual_node = args.gnn_type.endswith("virtual")
+
+    model = MethodNamePredictor(
+        num_vocab=len(vocab2idx),
+        max_seq_len=args.max_seq_len,
+        node_encoder=node_encoder,
+        num_layer=args.num_layers,
+        gnn_type=gnn_type,
+        emb_dim=args.emb_dim,
+        drop_ratio=args.drop_ratio,
+        residual=args.residual,
+        graph_pooling=args.graph_pooling,
+    ).to(device)
+
+    print(f"#Params: {sum(p.numel() for p in model.parameters())}")
+
+    train(
+        model,
+        num_epochs=args.epochs,
+        max_seq_len=args.max_seq_len,
         device=device,
         model_path=model_path,
         results_path=results_path,
         progress_path=progress_path,
-        data_path=args.data_path,
+        perf_path=perf_path,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_loader=test_loader,
+        vocab2idx=vocab2idx,
+        idx2vocab=idx2vocab,
     )

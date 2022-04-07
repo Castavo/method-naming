@@ -1,5 +1,6 @@
 import torch
 from src.graph_representation import GNN, ASTNodeEncoder
+from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling
 
 
 class MethodNamePredictor(torch.nn.Module):
@@ -15,6 +16,7 @@ class MethodNamePredictor(torch.nn.Module):
         drop_ratio=0.5,
         JK="last",
         graph_pooling="mean",
+        # virtual_node: bool = False,
     ):
         """
         num_tasks (int): number of labels to be predicted
@@ -25,7 +27,7 @@ class MethodNamePredictor(torch.nn.Module):
 
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
-        self.JK = JK
+        self.JK = JK # Jumping Knowledge
         self.emb_dim = emb_dim
         self.num_vocab = num_vocab
         self.max_seq_len = max_seq_len
@@ -44,6 +46,15 @@ class MethodNamePredictor(torch.nn.Module):
             gnn_type=gnn_type,
         )
 
+        if graph_pooling == "sum":
+            self.pool = SumPooling()
+        elif graph_pooling == "mean":
+            self.pool = AvgPooling()
+        elif graph_pooling == "max":
+            self.pool = MaxPooling()
+        else:
+            raise ValueError("Invalid graph pooling type.")
+
         self.predict_method_name = torch.nn.ModuleList(
             [torch.nn.Linear(emb_dim, num_vocab) for _ in range(max_seq_len)]
         )
@@ -55,7 +66,9 @@ class MethodNamePredictor(torch.nn.Module):
             i-th element represents prediction at i-th position of the sequence.
         """
 
-        graph_representation = self.gnn(batched_data)
+        node_features = self.gnn(batched_data)
+
+        graph_representation = self.pool(batched_data, node_features)
 
         pred_list = [predictor(graph_representation) for predictor in self.predict_method_name]
 
