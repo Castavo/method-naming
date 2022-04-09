@@ -264,12 +264,13 @@ if __name__ == "__main__":
         num_vocab=len(vocab2idx),
         max_seq_len=args.max_seq_len,
         node_encoder=node_encoder,
-        num_layer=args.num_layers,
+        num_layers=args.num_layers,
         gnn_type=gnn_type,
         emb_dim=args.emb_dim,
         drop_ratio=args.drop_ratio,
         residual=args.residual,
         graph_pooling=args.graph_pooling,
+        virtual_node=virtual_node,
     ).to(device)
 
     print(f"#Params: {sum(p.numel() for p in model.parameters())}")
