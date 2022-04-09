@@ -6,6 +6,7 @@ dependencies:
   - python=3.9
   - cudatoolkit=11.3
   - dgl-cuda11.3
+  - ipykernel
   - matplotlib
   - networkx
   - numpy
@@ -16,3 +17,4 @@ dependencies:
   - tqdm
   - pip:
     - ogb
+    - pydot
