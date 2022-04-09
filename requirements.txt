@@ -1,8 +1,0 @@
-numpy
-ogb
-pandas
-scikit-learn
-torch
-torch-geometric
-torchvision
-tqdm
