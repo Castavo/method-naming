@@ -80,6 +80,7 @@ def train(
             best_valid = valid_perf[EVAL_METRIC]
             best_model_state_dict = deepcopy(model.state_dict())
             if model_path:
+                os.remove(model_path)
                 torch.save(best_model_state_dict, model_path)
 
     best_val_epoch = np.argmax(np.array(valid_curve))
