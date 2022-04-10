@@ -67,7 +67,10 @@ class GNN(nn.Module):
     @staticmethod
     def add_virtual_nodes(batched_graph: DGLGraph):
         n_nodes = batched_graph.number_of_nodes()
-        graph_num_nodes, graph_num_edges = batched_graph.batch_num_nodes(), batched_graph.batch_num_edges()
+        graph_num_nodes, graph_num_edges = (
+            batched_graph.batch_num_nodes(),
+            batched_graph.batch_num_edges(),
+        )
         virtual_nodes_idxs = []
         for i, graph_size in enumerate(graph_num_nodes):
             virtual_nodes_idxs += [n_nodes + i] * graph_size
@@ -85,14 +88,10 @@ class GNN(nn.Module):
         batched_graph.remove_nodes(np.arange(n_nodes - len(graph_num_nodes), n_nodes))
         batched_graph.set_batch_num_edges(graph_num_edges)
         batched_graph.set_batch_num_nodes(graph_num_nodes)
-        
 
     def forward(self, batched_graph: DGLGraph):
-        # TODO: add the node encoding to the preprocessing
         nodes_embeddings = [
-            self.node_encoder(
-                batched_graph.ndata["feat"], batched_graph.ndata["depth"].view(-1)
-            )
+            self.node_encoder(batched_graph.ndata["feat"], batched_graph.ndata["depth"].view(-1))
         ]
         if self.virtual_node:
             # I have to store the batch size because it disappears when the graph is edited

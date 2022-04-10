@@ -1,15 +1,20 @@
-import numpy as np
 import json
 import os
-from dgl.dataloading import GraphDataLoader
+
+import numpy as np
 from dgl import load_graphs
+from dgl.dataloading import GraphDataLoader
 from ogb.graphproppred import collate_dgl
 
 from src.vocab_utils import get_vocab_mapping
 
 
 def get_data_loaders(
-    data_path: str, batch_size: int, max_seq_len: int, num_vocab: int, num_workers: int,
+    data_path: str,
+    batch_size: int,
+    max_seq_len: int,
+    num_vocab: int,
+    num_workers: int,
 ):
 
     data_loaders = {}

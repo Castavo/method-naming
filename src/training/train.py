@@ -21,6 +21,7 @@ from src.training.train_epoch import train_epoch
 
 EVAL_METRIC = "F1"
 
+
 def train(
     model: MethodNamePredictor,
     num_epochs: int,
@@ -103,7 +104,7 @@ def train(
     if perf_path != "":
         csv_writer = csv.writer(open(perf_path, "w"))
         csv_writer.writerows([("Train", "Val")] + list(zip(train_curve, valid_curve)))
-    
+
     return model
 
 
@@ -125,7 +126,10 @@ if __name__ == "__main__":
         description="GNN baselines on ogbg-code2 data with Pytorch Geometrics"
     )
     parser.add_argument(
-        "--gpu", type=int, default=0, help="which gpu to use if any (default: 0)",
+        "--gpu",
+        type=int,
+        default=0,
+        help="which gpu to use if any (default: 0)",
     )
     parser.add_argument(
         "--gnn_type",
@@ -133,7 +137,10 @@ if __name__ == "__main__":
         help="GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gcn-virtual)",
     )
     parser.add_argument(
-        "--drop_ratio", type=float, default=0., help="dropout ratio (default: 0)",
+        "--drop_ratio",
+        type=float,
+        default=0.0,
+        help="dropout ratio (default: 0)",
     )
     parser.add_argument(
         "--max_seq_len",
@@ -183,9 +190,14 @@ if __name__ == "__main__":
         help="number of epochs to train (default: 25)",
     )
     parser.add_argument(
-        "--num_workers", type=int, default=0, help="number of workers (default: 0)",
+        "--num_workers",
+        type=int,
+        default=0,
+        help="number of workers (default: 0)",
     )
-    parser.add_argument("--data_path", default=".", help="path to store and/or fetch ogbg-code2 data")
+    parser.add_argument(
+        "--data_path", default=".", help="path to store and/or fetch ogbg-code2 data"
+    )
     parser.add_argument("--preprocessed_path", default=".", help="path to the preprocessed dataset")
     parser.add_argument("--results_path", default="", help="path to output results")
     parser.add_argument("--model_path", default="", help="path to save model")
@@ -197,9 +209,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = (
-        torch.device("cuda:" + str(args.gpu))
-        if torch.cuda.is_available()
-        else torch.device("cpu")
+        torch.device("cuda:" + str(args.gpu)) if torch.cuda.is_available() else torch.device("cpu")
     )
 
     ### Prepare outputs
@@ -220,7 +230,6 @@ if __name__ == "__main__":
         results_path = args.results_path
         progress_path, perf_path = "", ""
 
-
     ### automatic dataloading and splitting
     print("Loading data...")
     train_loader, valid_loader, test_loader, vocab2idx, idx2vocab = get_data_loaders(
@@ -231,9 +240,7 @@ if __name__ == "__main__":
         num_workers=args.num_workers,
     )
 
-    nodetypes_mapping = pd.read_csv(
-        os.path.join(args.data_path, "mapping", "typeidx2type.csv.gz")
-    )
+    nodetypes_mapping = pd.read_csv(os.path.join(args.data_path, "mapping", "typeidx2type.csv.gz"))
     nodeattributes_mapping = pd.read_csv(
         os.path.join(args.data_path, "mapping", "attridx2attr.csv.gz")
     )

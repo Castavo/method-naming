@@ -4,8 +4,9 @@ from ogb.graphproppred import Evaluator
 from torch.optim import Optimizer
 from tqdm import tqdm
 
-from src.vocab_utils import labels_to_tensor
 from src.training.evaluate import empty_imput_dict, expand_input_dict
+from src.vocab_utils import labels_to_tensor
+
 
 def train_epoch(
     model: torch.nn.Module,

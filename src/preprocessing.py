@@ -2,10 +2,10 @@ import argparse
 import json
 import os
 
-from dgl import DGLGraph, save_graphs
-from tqdm import tqdm
 import torch
-from ogb.graphproppred import DglGraphPropPredDataset, collate_dgl
+from dgl import DGLGraph, save_graphs
+from ogb.graphproppred import DglGraphPropPredDataset
+from tqdm import tqdm
 
 
 def augment_edge(graph: DGLGraph):
@@ -45,9 +45,7 @@ def augment_edge(graph: DGLGraph):
     )
 
     ##### Next-token edge
-    attributed_node_idx_in_dfs_order = torch.where(
-        graph.ndata["is_attributed"].view(-1) == 1
-    )[0]
+    attributed_node_idx_in_dfs_order = torch.where(graph.ndata["is_attributed"].view(-1) == 1)[0]
 
     ## build next token edge
     # Given: attributed_node_idx_in_dfs_order
@@ -67,9 +65,7 @@ def augment_edge(graph: DGLGraph):
         dim=1,
     )
 
-    graph.add_edges(
-        edge_index_nextoken[0], edge_index_nextoken[1], {"attr": edge_attr_nextoken}
-    )
+    graph.add_edges(edge_index_nextoken[0], edge_index_nextoken[1], {"attr": edge_attr_nextoken})
 
     ##### Inverse next-token edge
     edge_index_nextoken_inverse = (edge_index_nextoken[1], edge_index_nextoken[0])

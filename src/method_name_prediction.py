@@ -1,6 +1,7 @@
-from torch import nn 
+from dgl.nn.pytorch.glob import AvgPooling, GlobalAttentionPooling, MaxPooling, SumPooling
+from torch import nn
+
 from src.graph_representation import GNN, ASTNodeEncoder
-from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling, GlobalAttentionPooling
 
 
 class MethodNamePredictor(nn.Module):
@@ -14,7 +15,7 @@ class MethodNamePredictor(nn.Module):
         gnn_type="gin",
         residual=False,
         drop_ratio=0.5,
-        JK="last", # Jumping Knowledge
+        JK="last",  # Jumping Knowledge
         graph_pooling="mean",
         virtual_node: bool = False,
     ):
