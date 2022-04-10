@@ -45,10 +45,13 @@ class GNN(nn.Module):
                     GINConv(
                         nn.Sequential(
                             nn.Linear(emb_dim, emb_dim),
+                            nn.BatchNorm1d(emb_dim),
                             nn.ReLU(),
                             nn.Linear(emb_dim, emb_dim),
+                            nn.BatchNorm1d(emb_dim),
                             nn.ReLU(),
                             nn.Linear(emb_dim, emb_dim),
+                            nn.BatchNorm1d(emb_dim),
                             nn.ReLU(),
                         ),
                         "sum",

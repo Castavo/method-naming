@@ -1,9 +1,9 @@
-import torch
+from torch import nn 
 from src.graph_representation import GNN, ASTNodeEncoder
-from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling
+from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling, GlobalAttentionPooling
 
 
-class MethodNamePredictor(torch.nn.Module):
+class MethodNamePredictor(nn.Module):
     def __init__(
         self,
         num_vocab: int,
@@ -45,11 +45,15 @@ class MethodNamePredictor(torch.nn.Module):
             self.pool = AvgPooling()
         elif graph_pooling == "max":
             self.pool = MaxPooling()
+        elif graph_pooling == "attention":
+            self.pool = GlobalAttentionPooling(
+                nn.Sequential(nn.Linear(emb_dim, emb_dim), nn.ReLU(), nn.Linear(emb_dim, 1))
+            )
         else:
             raise ValueError("Invalid graph pooling type.")
 
-        self.predict_method_name = torch.nn.ModuleList(
-            [torch.nn.Linear(emb_dim, num_vocab) for _ in range(max_seq_len)]
+        self.predict_method_name = nn.ModuleList(
+            [nn.Linear(emb_dim, num_vocab) for _ in range(max_seq_len)]
         )
 
     def forward(self, batched_data):
@@ -61,8 +65,8 @@ class MethodNamePredictor(torch.nn.Module):
 
         node_features = self.gnn(batched_data)
 
-        graph_representation = self.pool(batched_data, node_features)
+        graph_representations = self.pool(batched_data, node_features)
 
-        pred_list = [predictor(graph_representation) for predictor in self.predict_method_name]
+        pred_list = [predictor(graph_representations) for predictor in self.predict_method_name]
 
         return pred_list
